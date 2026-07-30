@@ -1,0 +1,12 @@
+[project]
+name = "terra-invicta-viewer"
+version = "0.1.0"
+description = "A local-first browser tool for analyzing Terra Invicta save files."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+# The application is a static JavaScript site. Python is used for its local
+# development server, so there is no Python package to install into the env.
+package = false
