@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Local-first Terra Invicta save analyzer with country-level faction influence attribution.">
+  <title>Terra Invicta Influence Viewer</title>
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div>
+      <h1>Terra Invicta Influence Viewer</h1>
+      <p>Find which countries bankroll each faction through public opinion.</p>
+    </div>
+    <div class="privacy-badge">Local-only analysis</div>
+  </header>
+
+  <main>
+    <div id="status" role="status" aria-live="polite">Choose a Terra Invicta save to begin.</div>
+
+    <section id="landing">
+      <div id="drop-zone" class="drop-zone">
+        <h2>Drop a save here</h2>
+        <p>Supports plain JSON/JSON5 and gzip-compressed saves. The file is parsed in your browser and is never uploaded.</p>
+        <label class="file-button">
+          Choose save
+          <input id="save-file" type="file" accept=".json,.json5,.gz,application/json,application/gzip">
+        </label>
+      </div>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="dashboard-header">
+        <div>
+          <h2>Influence attribution</h2>
+          <div id="file-meta"></div>
+        </div>
+        <label class="file-button">
+          Open another save
+          <input id="save-file-secondary" type="file" accept=".json,.json5,.gz,application/json,application/gzip">
+        </label>
+      </div>
+
+      <div class="toolbar">
+        <label>Faction <select id="faction-select"></select></label>
+        <label>Search <input id="nation-search" type="search" placeholder="Nation name"></label>
+        <label>Sort
+          <select id="sort-select">
+            <option value="monthly-desc">Current influence, high to low</option>
+            <option value="marginal-desc">Value per percentage point</option>
+            <option value="population-desc">Population</option>
+            <option value="support-desc">Support percentage</option>
+            <option value="nation-asc">Nation name</option>
+            <option value="monthly-asc">Current influence, low to high</option>
+          </select>
+        </label>
+        <span class="spacer"></span>
+        <button id="export-csv" type="button">Export CSV</button>
+      </div>
+
+      <div id="summary-cards" class="summary-grid"></div>
+
+      <section class="scenario-panel">
+        <h3>Public Campaign accounting scenario</h3>
+        <div class="scenario-controls">
+          <label for="scenario-pp">Assume support falls by</label>
+          <input id="scenario-pp" type="range" min="0" max="25" step="0.5" value="5">
+          <strong id="scenario-value">5.0 pp</strong>
+          <button id="select-top" type="button">Select top 10</button>
+          <button id="clear-selection" type="button">Clear selection</button>
+        </div>
+        <div id="scenario-summary"></div>
+      </section>
+
+      <section class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>Nation</th>
+                <th>Population M</th>
+                <th>Support</th>
+                <th>Supporters M</th>
+                <th>Influence / month</th>
+                <th>Per 1 pp</th>
+                <th>Scenario loss</th>
+                <th>Control point owners</th>
+              </tr>
+            </thead>
+            <tbody id="nation-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="secondary-grid">
+        <section class="panel">
+          <h3>All factions</h3>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Faction</th><th>Supporters M</th><th>Influence / month</th><th>Influence / year</th><th>Leads in nations</th></tr></thead>
+              <tbody id="faction-summary-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <details id="diagnostics" class="panel">
+          <summary>Schema diagnostics</summary>
+          <ul id="diagnostics-list"></ul>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
