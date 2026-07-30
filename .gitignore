@@ -1,7 +1,4 @@
 .DS_Store
 node_modules/
-<<<<<<< HEAD
 .venv/
-=======
->>>>>>> 918dc4917cebb2f8b947043edc807239630f24fe
 coverage/

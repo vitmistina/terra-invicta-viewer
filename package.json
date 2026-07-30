@@ -5,11 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-<<<<<<< HEAD
     "serve": "uv run python -m http.server 8080"
-=======
-    "serve": "python3 -m http.server 8080"
->>>>>>> 918dc4917cebb2f8b947043edc807239630f24fe
   },
   "engines": {
     "node": ">=20"
