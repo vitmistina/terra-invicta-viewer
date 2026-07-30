@@ -1,6 +1,5 @@
 import { analyzeFactionThreat } from './threat-analyzer.js';
 import { downloadText } from './csv.js';
-import { loadSaveFile } from './save-loader.js';
 
 const state = {
   analysis: undefined,
@@ -9,7 +8,6 @@ const state = {
 };
 
 const elements = {
-  fileInputs: [document.querySelector('#save-file'), document.querySelector('#save-file-secondary')],
   status: document.querySelector('#status'),
   modeTabs: [...document.querySelectorAll('[data-mode]')],
   influenceMode: document.querySelector('#influence-mode'),
@@ -26,12 +24,9 @@ const elements = {
   exportButton: document.querySelector('#export-threat-csv'),
 };
 
-for (const input of elements.fileInputs) {
-  input.addEventListener('change', event => {
-    const [file] = event.target.files;
-    if (file) void analyzeFile(file);
-  });
-}
+window.addEventListener('terra-invicta-save-loaded', event => {
+  analyzeLoadedSave(event.detail);
+});
 
 for (const tab of elements.modeTabs) {
   tab.addEventListener('click', () => {
@@ -52,9 +47,8 @@ elements.exportButton.addEventListener('click', () => {
 
 renderMode();
 
-async function analyzeFile(file) {
+function analyzeLoadedSave(save) {
   try {
-    const save = await loadSaveFile(file);
     state.analysis = analyzeFactionThreat(save.root);
     state.selectedFactionId = state.analysis.playerFactionId ?? state.analysis.factions[0]?.id;
     renderThreat();
