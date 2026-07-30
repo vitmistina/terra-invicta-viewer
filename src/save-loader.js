@@ -2,8 +2,17 @@ import { parseJson5 } from './json5.js';
 
 const GZIP_MAGIC_0 = 0x1f;
 const GZIP_MAGIC_1 = 0x8b;
+const loadCache = new WeakMap();
 
-export async function loadSaveFile(file) {
+export function loadSaveFile(file) {
+  const cached = loadCache.get(file);
+  if (cached) return cached;
+  const loading = loadSaveFileUncached(file);
+  loadCache.set(file, loading);
+  return loading;
+}
+
+async function loadSaveFileUncached(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const isGzip = file.name.toLowerCase().endsWith('.gz') || hasGzipMagic(bytes);
   const textBytes = isGzip ? await decompressGzip(bytes) : bytes;
