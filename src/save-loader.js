@@ -18,12 +18,18 @@ async function loadSaveFileUncached(file) {
   const textBytes = isGzip ? await decompressGzip(bytes) : bytes;
   const text = new TextDecoder('utf-8', { fatal: true }).decode(textBytes);
 
-  return {
+  const loadedSave = {
     fileName: file.name,
     byteSize: bytes.byteLength,
     format: isGzip ? 'gzip-json5' : 'json5',
     root: parseJson5(text),
   };
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('terra-invicta-save-loaded', { detail: loadedSave }));
+  }
+
+  return loadedSave;
 }
 
 export function hasGzipMagic(bytes) {
