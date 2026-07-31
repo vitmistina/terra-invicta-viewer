@@ -206,14 +206,7 @@
         <div class="toolbar">
           <span id="mining-perspective" class="confidence-badge"></span>
           <label>Search <input id="mining-search" type="search" placeholder="Site or body"></label>
-          <label>Status
-            <select id="mining-occupancy">
-              <option value="unclaimed">Unclaimed only</option>
-              <option value="all">All known sites</option>
-              <option value="player">Your sites</option>
-              <option value="other">Claimed or pending</option>
-            </select>
-          </label>
+          <label class="claimed-sites-toggle"><input id="mining-show-claimed" type="checkbox"><span>Show claimed sites</span></label>
           <label>Body <select id="mining-body"><option value="all">All prospected bodies</option></select></label>
           <label>Sort
             <select id="mining-sort">
