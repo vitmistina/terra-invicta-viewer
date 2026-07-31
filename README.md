@@ -39,7 +39,7 @@ The default Influence view targets **The Servants** so you can identify the coun
 - Includes Balanced, Equal-weight, and Rare-resource presets.
 - Filters by body and site or body name.
 - Hides claimed, occupied, player-owned, and pending sites by default; a **Show claimed sites** toggle adds them back for comparison.
-- Shows the dominant contributors to each site's score and exports the currently visible ranking as CSV.
+- Shows the dominant contributors to each site's score and exports the currently visible ranking as CSV, respecting the claimed-sites toggle.
 
 ### Save handling
 
