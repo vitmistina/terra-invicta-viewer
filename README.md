@@ -1,11 +1,12 @@
 # Terra Invicta Save Viewer
 
-A local-first browser tool that reads a Terra Invicta save and provides two complementary strategic views:
+A local-first browser tool that reads a Terra Invicta save and provides three complementary strategic views:
 
 1. **Influence attribution** shows which countries generate public-opinion Influence for each faction.
 2. **Faction threat** reconstructs the score used to identify the most powerful human enemy and explains which assets contribute to it.
+3. **Mining prospects** ranks every site on bodies the player faction has prospected, using editable resource-yield weights.
 
-The default Influence view targets **The Servants** so you can identify the countries currently funding them and model how much Influence a Public Campaign strategy could remove. The Threat view defaults to the detected human player faction.
+The default Influence view targets **The Servants** so you can identify the countries currently funding them and model how much Influence a Public Campaign strategy could remove. The Threat and Mining views default to the detected human player faction.
 
 ## Features
 
@@ -28,6 +29,17 @@ The default Influence view targets **The Servants** so you can identify the coun
 - Displays each faction's saved `mostPowerfulHumanEnemy` and `selfAssessement` fields for comparison with the reconstruction.
 - Marks inferred and unresolved template values instead of silently presenting them as exact.
 - Exports the threat leaderboard as CSV.
+
+### Mining prospects mode
+
+- Reconstructs the player faction's fully prospected space bodies from faction intel entries of at least `1.0`.
+- Includes every `TIHabSiteState` on those bodies and converts saved daily yields to monthly yields using the game's average month length.
+- Ranks sites by a transparent weighted sum of Water, Volatiles, Base Metals, Noble Metals, and Fissiles.
+- Provides editable numeric weights, persisted locally in the browser.
+- Includes Balanced, Equal-weight, and Rare-resource presets.
+- Filters by body, site or body name, and claim status.
+- Defaults to unclaimed sites while retaining views for player-owned and rival-owned sites.
+- Shows the dominant contributors to each site's score and exports the filtered ranking as CSV.
 
 ### Save handling
 
@@ -80,6 +92,30 @@ The actual game calculation is observer-dependent for campaign objectives: a vie
 
 Ship structural integrity is resolved from saved fields where available and otherwise from a bundled human-hull catalog. Hab module tiers are resolved from saved fields first, then from a conservative template-name catalog and heuristics. Unresolved active assets are excluded and make the displayed score an explicit lower bound.
 
+## Mining prospect score
+
+The default **Balanced strategic** weights are:
+
+```text
+Water         1.0
+Volatiles     1.0
+Base metals   0.5
+Noble metals  3.0
+Fissiles      6.0
+```
+
+The score is:
+
+```text
+site score = Σ monthly resource yield × selected resource weight
+```
+
+These defaults are intentionally a strategic heuristic, not a claim about universal exchange value. Base metals are discounted because they are comparatively common and often appear in higher raw volumes. Water and Volatiles remain baseline operational resources. Noble Metals receive a scarcity premium, while Fissiles receive the largest premium because a small high-fissile site can be strategically valuable despite modest bulk output.
+
+The frontend allows any non-negative weights. The Equal-weight preset removes strategic assumptions; the Rare-resource preset emphasises Noble Metals and Fissiles more aggressively.
+
+A body is treated as prospected when the player faction's `intel` entry for its `TISpaceBodyState` is at least `1.0`. The game then exposes all hab sites on that body. Saved site yields are daily values; the viewer multiplies them by `30.436875` to display monthly output. The ranking uses base site yields and does not apply faction-specific mining bonuses, which affect all candidate sites similarly and do not belong to the geological prospect itself.
+
 ## Run locally
 
 The app is static, but browser modules must be served over HTTP:
@@ -92,8 +128,7 @@ Then open <http://localhost:8080>.
 
 No dependency installation is required.
 
-The repository is configured as a `uv` project for the Python development
-server. The browser application itself remains dependency-free JavaScript.
+The repository is configured as a `uv` project for the Python development server. The browser application itself remains dependency-free JavaScript.
 
 ## Tests
 
@@ -101,20 +136,24 @@ server. The browser application itself remains dependency-free JavaScript.
 npm test
 ```
 
-The test suite uses Node's built-in test runner and covers JSON5 parsing, relational region lookup, influence calculations, scenario calculations, threat component attribution, player-faction detection, active-module filtering, CP-weight fallback, and self-assessment thresholds.
+The test suite uses Node's built-in test runner and covers JSON5 parsing, relational region lookup, influence calculations, scenario calculations, threat component attribution, player-faction detection, active-module filtering, CP-weight fallback, self-assessment thresholds, prospecting-intel filtering, site-to-body resolution, yield conversion, occupancy classification, and custom mining weights.
 
 ## Supported save assumptions
 
-Groups are located by suffix rather than requiring a full namespace. The two modes currently inspect:
+Groups are located by suffix rather than requiring a full namespace. The three modes currently inspect:
 
 - `TINationState`
 - `TIRegionState`
 - `TIControlPoint`
 - `TIFactionState`
 - `TIPlayerState`
+- `TIMetadataState`
 - `TIArmyState`
 - `TISectorState`
 - `TIHabModuleState`
+- `TIHabState`
+- `TIHabSiteState`
+- `TISpaceBodyState`
 - `TISpaceFleetState`
 - `TISpaceShipState`
 
@@ -126,4 +165,5 @@ Known field aliases are deliberately narrow and visible in diagnostics. Unknown 
 - Influence mode calculates the public-opinion component only. It does not reconcile organisations, councilor traits, hab modules, or Control Point Capacity penalties against total faction income.
 - Threat objective scoring is an omniscient estimate rather than a complete observer-by-observer intelligence reconstruction.
 - Template catalogs may lag a newly released game build. Unknown active modules or hulls are explicitly reported.
+- Mining scores do not include transfer time, delta-v, solar output, construction cost, faction mining bonuses, existing hab infrastructure, or strategic access constraints. They answer the narrower question: how attractive is the known geological yield under the selected resource priorities?
 - Gzip loading relies on the browser's native `DecompressionStream` API.
