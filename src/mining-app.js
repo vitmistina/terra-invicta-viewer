@@ -32,7 +32,7 @@ const elements = {
   weightInputs: [...document.querySelectorAll('[data-mining-weight]')],
   presetButtons: [...document.querySelectorAll('[data-mining-preset]')],
   searchInput: document.querySelector('#mining-search'),
-  showClaimedToggle: installClaimedToggle(document.querySelector('#mining-occupancy')),
+  showClaimedToggle: document.querySelector('#mining-show-claimed'),
   bodySelect: document.querySelector('#mining-body'),
   sortSelect: document.querySelector('#mining-sort'),
   exportButton: document.querySelector('#export-mining-csv'),
@@ -72,7 +72,7 @@ elements.searchInput.addEventListener('input', event => {
   renderMining();
 });
 
-elements.showClaimedToggle?.addEventListener('change', event => {
+elements.showClaimedToggle.addEventListener('change', event => {
   state.showClaimed = event.target.checked;
   renderMining();
 });
@@ -95,26 +95,6 @@ elements.exportButton.addEventListener('click', () => {
 renderWeightInputs();
 renderMode();
 
-function installClaimedToggle(select) {
-  const existingLabel = select?.closest('label');
-  if (!existingLabel) return undefined;
-
-  const replacement = document.createElement('label');
-  replacement.className = 'claimed-sites-toggle';
-
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.id = 'mining-show-claimed';
-  checkbox.checked = false;
-
-  const text = document.createElement('span');
-  text.textContent = 'Show claimed sites';
-
-  replacement.append(checkbox, text);
-  existingLabel.replaceWith(replacement);
-  return checkbox;
-}
-
 function renderMode() {
   for (const [mode, panel] of Object.entries(elements.modePanels)) {
     if (panel) panel.hidden = mode !== state.mode;
@@ -134,7 +114,7 @@ function analyzeLoadedSave(save) {
     state.showClaimed = false;
     state.bodyId = 'all';
     elements.searchInput.value = '';
-    if (elements.showClaimedToggle) elements.showClaimedToggle.checked = false;
+    elements.showClaimedToggle.checked = false;
     renderMining();
   } catch (error) {
     console.error(error);
