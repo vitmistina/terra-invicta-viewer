@@ -37,9 +37,9 @@ The default Influence view targets **The Servants** so you can identify the coun
 - Ranks sites by a transparent weighted sum of Water, Volatiles, Base Metals, Noble Metals, and Fissiles.
 - Provides editable numeric weights, persisted locally in the browser.
 - Includes Balanced, Equal-weight, and Rare-resource presets.
-- Filters by body, site or body name, and claim status.
-- Defaults to unclaimed sites while retaining views for player-owned and rival-owned sites.
-- Shows the dominant contributors to each site's score and exports the filtered ranking as CSV.
+- Filters by body and site or body name.
+- Hides claimed, occupied, player-owned, and pending sites by default; a **Show claimed sites** toggle adds them back for comparison.
+- Shows the dominant contributors to each site's score and exports the currently visible ranking as CSV.
 
 ### Save handling
 
