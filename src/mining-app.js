@@ -14,7 +14,7 @@ const state = {
   analysis: undefined,
   weights: loadStoredWeights(),
   search: '',
-  occupancy: 'unclaimed',
+  showClaimed: false,
   bodyId: 'all',
   sort: 'score-desc',
   mode: 'influence',
@@ -32,7 +32,7 @@ const elements = {
   weightInputs: [...document.querySelectorAll('[data-mining-weight]')],
   presetButtons: [...document.querySelectorAll('[data-mining-preset]')],
   searchInput: document.querySelector('#mining-search'),
-  occupancySelect: document.querySelector('#mining-occupancy'),
+  showClaimedToggle: installClaimedToggle(document.querySelector('#mining-occupancy')),
   bodySelect: document.querySelector('#mining-body'),
   sortSelect: document.querySelector('#mining-sort'),
   exportButton: document.querySelector('#export-mining-csv'),
@@ -72,8 +72,8 @@ elements.searchInput.addEventListener('input', event => {
   renderMining();
 });
 
-elements.occupancySelect.addEventListener('change', event => {
-  state.occupancy = event.target.value;
+elements.showClaimedToggle?.addEventListener('change', event => {
+  state.showClaimed = event.target.checked;
   renderMining();
 });
 
@@ -95,6 +95,26 @@ elements.exportButton.addEventListener('click', () => {
 renderWeightInputs();
 renderMode();
 
+function installClaimedToggle(select) {
+  const existingLabel = select?.closest('label');
+  if (!existingLabel) return undefined;
+
+  const replacement = document.createElement('label');
+  replacement.className = 'claimed-sites-toggle';
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.id = 'mining-show-claimed';
+  checkbox.checked = false;
+
+  const text = document.createElement('span');
+  text.textContent = 'Show claimed sites';
+
+  replacement.append(checkbox, text);
+  existingLabel.replaceWith(replacement);
+  return checkbox;
+}
+
 function renderMode() {
   for (const [mode, panel] of Object.entries(elements.modePanels)) {
     if (panel) panel.hidden = mode !== state.mode;
@@ -111,8 +131,10 @@ function analyzeLoadedSave(save) {
   try {
     state.analysis = analyzeMiningProspects(save.root);
     state.search = '';
+    state.showClaimed = false;
     state.bodyId = 'all';
     elements.searchInput.value = '';
+    if (elements.showClaimedToggle) elements.showClaimedToggle.checked = false;
     renderMining();
   } catch (error) {
     console.error(error);
@@ -166,16 +188,16 @@ function renderBodySelect() {
 }
 
 function renderSummary(rows) {
-  const allScored = scoreMiningSites(state.analysis.sites, state.weights).sort((a, b) => b.score - a.score);
   const top = rows[0];
   const unclaimed = state.analysis.sites.filter(site => site.occupancyKey === 'unclaimed').length;
+  const claimed = state.analysis.sites.length - unclaimed;
   const topBody = aggregateBodies(rows)[0];
 
   elements.summaryCards.innerHTML = [
     summaryCard('Top visible prospect', top?.name ?? '—', top ? `${top.bodyName} · score ${formatNumber(top.score, 2)}` : 'no matching site'),
     summaryCard('Best visible body', topBody?.name ?? '—', topBody ? `${formatNumber(topBody.score, 2)} combined site score` : 'no matching site'),
     summaryCard('Sites shown', `${rows.length} of ${state.analysis.sites.length}`, `${unclaimed} unclaimed known sites`),
-    summaryCard('Highest known score', allScored[0] ? formatNumber(allScored[0].score, 2) : '—', allScored[0] ? `${allScored[0].name}, ${allScored[0].bodyName}` : 'no prospected sites'),
+    summaryCard('Claimed sites', state.showClaimed ? `${claimed} included` : `${claimed} hidden`, state.showClaimed ? 'toggle off to focus on available prospects' : 'toggle on to compare occupied deposits'),
   ].join('');
 }
 
@@ -227,10 +249,8 @@ function currentRows() {
   const rows = scoreMiningSites(state.analysis.sites, state.weights).filter(row => {
     const matchesSearch = !query || row.name.toLowerCase().includes(query) || row.bodyName.toLowerCase().includes(query);
     const matchesBody = state.bodyId === 'all' || String(row.bodyId) === state.bodyId;
-    const matchesOccupancy = state.occupancy === 'all'
-      || state.occupancy === row.occupancyKey
-      || (state.occupancy === 'other' && ['other', 'occupied', 'pending'].includes(row.occupancyKey));
-    return matchesSearch && matchesBody && matchesOccupancy;
+    const matchesClaimVisibility = state.showClaimed || row.occupancyKey === 'unclaimed';
+    return matchesSearch && matchesBody && matchesClaimVisibility;
   });
 
   return rows.sort((a, b) => {
