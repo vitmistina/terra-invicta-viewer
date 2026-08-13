@@ -80,9 +80,9 @@ function fixture() {
         }),
         entry(202, {
           templateName: 'CoilerDesign', displayName: 'Coiler Two', fleet: ref(100),
-          noseWeapons: [moduleSlot(70, 'HeavyCoilCannon', 0)],
-          hullWeapons: [moduleSlot(71, 'PhaserPointDefense', 0), moduleSlot(72, 'CoilgunBattery', 1)],
-          utilityModules: [moduleSlot(73, 'HeatSink', 0)], ammo: [],
+          noseWeapons: [{ $ref: '40' }],
+          hullWeapons: [{ $ref: '41' }, { $ref: '42' }],
+          utilityModules: [{ $ref: '43' }], ammo: [],
         }),
       ],
     },
@@ -97,6 +97,21 @@ function ship(root, id) {
   return root.gamestates.TISpaceShipState.find(item => item.Key.value === id).Value;
 }
 
+function resolveJsonRef(root, value) {
+  if (!value?.$ref) return value;
+  let found;
+  const visit = node => {
+    if (found || !node || typeof node !== 'object') return;
+    if (!Array.isArray(node) && node.$id === value.$ref) {
+      found = node;
+      return;
+    }
+    for (const child of Array.isArray(node) ? node : Object.values(node)) visit(child);
+  };
+  visit(root);
+  return found;
+}
+
 test('discovers player fleets, built ships, designs, and slot-compatible weapon targets', () => {
   const analysis = analyzeFleetCheats(fixture());
   assert.equal(analysis.playerFactionId, 1);
@@ -107,7 +122,7 @@ test('discovers player fleets, built ships, designs, and slot-compatible weapon 
   assert.ok(targets.some(item => item.moduleName === 'IonPointDefense'));
 });
 
-test('weapon edit changes the design template and propagates to every built ship using it', () => {
+test('weapon edit propagates through Terra Invicta shared $id/$ref module entries', () => {
   const original = fixture();
   const result = replaceDesignWeapon(original, {
     shipId: 200,
@@ -122,7 +137,8 @@ test('weapon edit changes the design template and propagates to every built ship
   assert.equal(first.templateName, 'CoilerDesign');
   assert.equal(sibling.templateName, 'CoilerDesign');
   assert.equal(first.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
-  assert.equal(sibling.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
+  assert.deepEqual(sibling.hullWeapons[0], { $ref: '41' });
+  assert.equal(resolveJsonRef(result.root, sibling.hullWeapons[0]).moduleTemplateName, 'IonPointDefense');
   assert.equal(unrelated.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
 
   const faction = groupValues(result.root, 'TIFactionState')[0];
@@ -132,7 +148,7 @@ test('weapon edit changes the design template and propagates to every built ship
   assert.equal(result.change.affectedShipCount, 2);
   assert.deepEqual(result.change.affectedShipIds.sort((a, b) => a - b), [200, 202]);
   assert.equal(original.gamestates.TIFactionState[0].Value.shipDesigns[0].hullWeaponTemplateEntries[0].moduleName, 'PhaserPointDefense', 'source root must remain untouched');
-  assert.equal(ship(original, 202).hullWeapons[0].moduleTemplateName, 'PhaserPointDefense', 'source built ships must remain untouched');
+  assert.equal(ship(original, 200).hullWeapons[0].moduleTemplateName, 'PhaserPointDefense', 'source defining module must remain untouched');
 });
 
 test('whole-ship correction copies donor technical state while preserving source identity and fleet history', () => {
