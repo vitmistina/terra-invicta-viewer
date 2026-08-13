@@ -44,16 +44,16 @@ The default Influence view targets **The Servants** so you can identify the coun
 
 ### Fleet and ship cheat mode
 
-- Lists the detected player's existing fleets and built ships.
-- Uses a selected built ship to identify its ship-design template and allows a deployed nose or hull weapon slot to be changed at the **design level**.
-- Propagates that design weapon change to every existing built player ship whose `templateName` points to the edited design, keeping the template and deployed ship states consistent.
-- Does not create private per-ship design clones for weapon edits.
-- Offers verified replacement weapons observed on the same hull, mount type, and starting slot elsewhere in the save.
-- Includes an advanced exact-template override for deliberate experiments with modules not observed in a verified compatible slot.
-- Allows one mistakenly built ship to be replaced with the complete saved technical configuration of another built player ship, useful for cases such as an extra coiler instead of a PD ship.
-- Preserves that corrected ship's game-state ID, display name, fleet and formation position, launch/refit dates, kills, officers, and other identity/history fields while copying the donor's technical configuration.
-- Whole-ship replacement is intentionally **per individual ship**; it does not rewrite the source design or every sibling ship using that design.
-- Remaps JSON reference metadata when cloning donor state so `$id` values are not duplicated.
+- Treats the player's dynamic `shipDesigns` entries as the primary objects for loadout editing.
+- Lists active ship design templates directly, including their saved display name, hull, template `dataName`, weapon slots, and number of built instances.
+- Reads editable weapon slots directly from `noseWeaponTemplateEntries` and `hullWeaponTemplateEntries`; a built ship is not required to discover or select a slot.
+- Uses one expert replacement control: an exact `moduleTemplateName` input with autocomplete suggestions from module names already present in the save.
+- Changes the selected design template itself and propagates the matching deployed weapon to every built ship whose `templateName` references that design.
+- Resolves Terra Invicta JSON `$id` / `$ref` indirection when propagating template changes. If one ship owns the concrete module object and sibling ships contain only `$ref` wrappers, the concrete definition is mutated once and the reference structure is preserved.
+- Supports active designs with zero built ships; those edits affect future builds only.
+- Separately allows one mistakenly built ship to be replaced with the complete saved technical configuration of another built player ship, useful for cases such as an extra coiler instead of a PD ship.
+- Preserves the corrected ship's game-state ID, display name, fleet and formation position, launch/refit dates, kills, officers, and other identity/history fields while copying the donor's technical configuration.
+- Remaps JSON reference metadata when cloning donor state so locally-owned `$id` values are not duplicated.
 - Stages any number of edits in memory, shows an explicit change log, and supports resetting all staged edits.
 - Downloads a separate `-cheat` save instead of modifying the loaded source.
 - Preserves gzip output when the input is gzip and the browser supports `CompressionStream`.
@@ -136,22 +136,20 @@ A body is treated as prospected when the player faction's `intel` entry for its 
 
 ## Cheat-mode mutation model
 
-Built `TISpaceShipState` objects persist their deployed `noseWeapons`, `hullWeapons`, `utilityModules`, ammo and other technical state separately from the faction's dynamic ship-design templates. The game also validates deployed weapon slots against the ship's design on load. For that reason, the cheat editor changes both the design and the already-built ships that use it.
+Built `TISpaceShipState` objects persist deployed module state separately from the faction's dynamic ship-design templates. Terra Invicta may also deduplicate identical deployed module objects using JSON `$id` / `$ref` references across multiple ships.
 
-For a design weapon edit it:
+For a template weapon edit the editor therefore performs a coordinated mutation:
 
-1. uses the selected built ship to resolve the dynamic design through its `templateName`,
-2. changes the matching `noseWeaponTemplateEntries` or `hullWeaponTemplateEntries` entry on that design,
-3. finds every built player ship whose `templateName` references the same design,
-4. changes the corresponding deployed weapon slot on every one of those ships,
-5. updates matching inline ammo/damage module copies where present, and
-6. marks relevant cached ship values dirty where the save exposes those flags.
+1. locate the selected dynamic design by `dataName`,
+2. change the selected `noseWeaponTemplateEntries` or `hullWeaponTemplateEntries` entry,
+3. find every built player ship whose `templateName` points to that design,
+4. resolve the matching deployed module through the save-wide `$id` / `$ref` graph,
+5. mutate each unique concrete module definition once while preserving `$ref` wrappers, and
+6. mark relevant cached ship values dirty where those flags exist.
 
-No new design is created and all existing ships of the edited template remain on the same design.
+This is intentionally template-first. Built ships are consequences of a template edit, not the object used to choose the loadout.
 
-For a whole-ship correction, another already-built player ship acts as a donor blueprint. The donor's saved technical state is cloned with fresh JSON reference IDs, then the source ship's identity and fleet/history fields are restored onto that clone. The donor itself is unchanged. This operation is intentionally per-ship because its purpose is correcting one mistaken construction.
-
-This first implementation deliberately prefers real saved donor state over synthesizing an arbitrary unbuilt ship from template names. It is designed around correcting campaign bookkeeping mistakes, not generating impossible ships from scratch.
+For a whole-ship correction, another already-built player ship acts as a donor blueprint. The donor's saved technical state is cloned with fresh locally-owned JSON reference IDs, then the source ship's identity and fleet/history fields are restored onto that clone. The donor itself is unchanged.
 
 ## Run locally
 
@@ -173,7 +171,7 @@ The repository is configured as a `uv` project for the Python development server
 npm test
 ```
 
-The test suite uses Node's built-in test runner and covers JSON5 parsing, relational region lookup, influence calculations, scenario calculations, threat component attribution, player-faction detection, active-module filtering, CP-weight fallback, self-assessment thresholds, prospecting-intel filtering, site-to-body resolution, yield conversion, occupancy classification, custom mining weights, fleet/ship discovery, template-wide weapon propagation, donor-based ship replacement, JSON reference remapping, and non-finite save serialization.
+The test suite uses Node's built-in test runner and covers JSON5 parsing, relational region lookup, influence calculations, scenario calculations, threat component attribution, player-faction detection, active-module filtering, CP-weight fallback, self-assessment thresholds, prospecting-intel filtering, site-to-body resolution, yield conversion, occupancy classification, custom mining weights, fleet/ship discovery, template-first loadout discovery, `$id`/`$ref` template propagation, donor-based ship replacement, JSON reference remapping, browser module syntax, and non-finite save serialization.
 
 ## Supported save assumptions
 
@@ -203,8 +201,8 @@ Known field aliases are deliberately narrow and visible in diagnostics. Unknown 
 - Threat objective scoring is an omniscient estimate rather than a complete observer-by-observer intelligence reconstruction.
 - Template catalogs may lag a newly released game build. Unknown active modules or hulls are explicitly reported.
 - Mining scores do not include transfer time, delta-v, solar output, construction cost, faction mining bonuses, existing hab infrastructure, or strategic access constraints. They answer the narrower question: how attractive is the known geological yield under the selected resource priorities?
-- The verified weapon-swap list proves only that a module was observed on the same hull, mount type, and starting slot elsewhere in the save. It does not independently reconstruct every ship-module compatibility rule from game templates.
-- Ammo-bearing design weapon edits retain the existing saved ammo quantities while retargeting matching module references. For missiles and kinetics with materially different ammo behavior, donor-based whole-ship correction remains the safer first-version path.
+- Exact replacement module names are intentionally expert input. The editor does not independently reconstruct every game compatibility rule; an impossible module/hull/slot combination may still be rejected or repaired by the game.
+- Ammo-bearing template edits retain existing saved ammo quantities while retargeting matching module references. For substantially different missile/kinetic configurations, donor-based whole-ship correction is safer.
 - Whole-ship replacement copies the donor's saved technical condition as the blueprint and does not consume resources or construction time. This is intentionally a cheat, not a simulated refit.
 - Modified saves should always be tested from a backup. Save internals can change between Terra Invicta versions.
 - Gzip loading relies on the browser's native `DecompressionStream` API; gzip writing uses `CompressionStream` when available and falls back to an uncompressed JSON save otherwise.
