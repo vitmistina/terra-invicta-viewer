@@ -71,7 +71,7 @@ export function analyzeFleetCheats(root) {
       fleetId,
       fleetName: fleet ? displayName(fleet.value, fleet.id) : `Fleet ${fleetId ?? '?'}`,
       templateName,
-      designName: designDisplayName(design) ?? templateName || 'Unknown design',
+      designName: (designDisplayName(design) ?? templateName) || 'Unknown design',
       hullName: design?.hullName ?? 'Unknown hull',
       weapons,
       utilityModules: moduleNames(ship.value.utilityModules),
