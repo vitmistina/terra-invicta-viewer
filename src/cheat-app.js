@@ -3,8 +3,8 @@ import {
   compatibleWeaponTargets,
   humanizeModuleName,
   replaceBuiltShipFromDonor,
-  swapBuiltShipWeapon,
 } from './cheat-editor.js';
+import { replaceDesignWeapon } from './cheat-template-editor.js';
 import { buildModifiedSave, downloadBlob } from './save-writer.js';
 
 const state = {
@@ -74,7 +74,7 @@ elements.weaponApply.addEventListener('click', () => {
   if (!targetModuleName) return;
 
   try {
-    const result = swapBuiltShipWeapon(state.workingRoot, {
+    const result = replaceDesignWeapon(state.workingRoot, {
       shipId: ship.id,
       mount: weapon.mount,
       slotIndex: weapon.slotIndex,
@@ -216,9 +216,10 @@ function renderSummary() {
     ? ship.weapons.map(weapon => humanizeModuleName(weapon.moduleTemplateName)).join(' · ')
     : 'No deployed weapons found';
   const deltaV = Number.isFinite(ship.currentDeltaV) ? `${formatNumber(ship.currentDeltaV, 1)} kps` : '—';
+  const designShips = shipsUsingSelectedDesign();
   elements.summaryCards.innerHTML = [
     summaryCard('Selected ship', ship.name, ship.fleetName),
-    summaryCard('Design', ship.designName, ship.hullName),
+    summaryCard('Design', ship.designName, `${ship.hullName} · ${designShips.length} built ship${designShips.length === 1 ? '' : 's'} use it`),
     summaryCard('Current delta-v', deltaV, Number.isFinite(ship.currentMaxDeltaV) ? `${formatNumber(ship.currentMaxDeltaV, 1)} kps max` : 'saved ship state'),
     summaryCard('Weapons', `${ship.weapons.length} mount${ship.weapons.length === 1 ? '' : 's'}`, weapons),
   ].join('');
@@ -241,9 +242,10 @@ function renderWeaponEditor() {
     label: `${humanizeModuleName(target.moduleName)} · observed on ${target.designName}`,
   })));
 
+  const affected = shipsUsingSelectedDesign();
   elements.weaponNote.textContent = targets.length
-    ? `${targets.length} target weapon${targets.length === 1 ? '' : 's'} observed in the same hull, mount type, and slot. The edit creates a private cloned design for this ship only.`
-    : 'No verified replacement was observed at this exact hull/mount/slot. Advanced exact-template input is available, but the game may reject an incompatible module.';
+    ? `${targets.length} target weapon${targets.length === 1 ? '' : 's'} observed in the same hull, mount type, and slot. Editing ${ship?.designName ?? 'this design'} will propagate the deployed slot to all ${affected.length} built ship${affected.length === 1 ? '' : 's'} using that template.`
+    : `No verified replacement was observed at this exact hull/mount/slot. Advanced exact-template input is available. A successful edit will change the design and all ${affected.length} built ship${affected.length === 1 ? '' : 's'} using it.`;
   updateWeaponButton();
 }
 
@@ -323,6 +325,11 @@ function selectedFleet() {
 
 function selectedShip() {
   return state.analysis?.ships.find(ship => ship.id === state.selectedShipId);
+}
+
+function shipsUsingSelectedDesign() {
+  const ship = selectedShip();
+  return ship ? state.analysis?.ships.filter(item => item.templateName === ship.templateName) ?? [] : [];
 }
 
 function selectedWeapon() {
