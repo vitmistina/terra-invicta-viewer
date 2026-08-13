@@ -33,7 +33,10 @@ export function analyzeShipTemplates(root) {
       || a.displayName.localeCompare(b.displayName)
       || a.templateName.localeCompare(b.templateName));
 
-  const moduleNames = [...new Set(templates.flatMap(template => template.slots.map(slot => slot.moduleName)))].sort();
+  const moduleNames = [...new Set([
+    ...templates.flatMap(template => template.slots.map(slot => slot.moduleName)),
+    ...fleetAnalysis.weaponCatalog.map(item => item.moduleName),
+  ].filter(Boolean))].sort();
 
   return {
     ...fleetAnalysis,
