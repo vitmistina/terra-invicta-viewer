@@ -38,6 +38,7 @@ export function replaceDesignWeapon(root, { shipId, mount, slotIndex, targetModu
   const gamestates = getGamestates(draft);
   if (!gamestates) throw new Error('The save does not contain a gamestates object.');
   const groups = indexGroups(gamestates);
+  const references = buildReferenceIndex(draft);
   const faction = findStateById(groups, 'TIFactionState', analysis.playerFactionId);
   if (!faction) throw new Error('Could not resolve the player faction state.');
 
@@ -62,17 +63,23 @@ export function replaceDesignWeapon(root, { shipId, mount, slotIndex, targetModu
     if (!state) throw new Error(`Could not resolve built ship ${summary.name} (${summary.id}).`);
     const listKey = mount === 'nose' ? findOwnKey(state.value, ['noseWeapons']) : findOwnKey(state.value, ['hullWeapons']);
     const list = listKey && Array.isArray(state.value[listKey]) ? state.value[listKey] : [];
-    const deployedSlot = list.find(item => slotOf(item) === slotIndex);
+    const deployedSlot = list
+      .map(item => resolveReference(item, references))
+      .find(item => slotOf(item) === slotIndex);
     if (!deployedSlot) throw new Error(`${summary.name} has no ${mount} weapon beginning at slot ${slotIndex}; no changes were made.`);
     return { summary, state, deployedSlot };
   });
 
   designSlot.moduleName = targetModuleName;
 
+  const changedObjects = new Set();
   for (const { state, deployedSlot } of shipStates) {
     const oldDeployedModuleName = moduleNameOf(deployedSlot) ?? oldDesignModuleName;
-    setModuleTemplateName(deployedSlot, targetModuleName);
-    updateInlineModuleCopies(state.value, oldDeployedModuleName, targetModuleName, slotIndex);
+    if (!changedObjects.has(deployedSlot)) {
+      setModuleTemplateName(deployedSlot, targetModuleName);
+      changedObjects.add(deployedSlot);
+    }
+    updateInlineModuleCopies(state.value, oldDeployedModuleName, targetModuleName, slotIndex, references, changedObjects);
     markShipCachesDirty(state.value);
   }
 
@@ -120,19 +127,42 @@ function findStateById(groups, suffix, wantedId) {
   return undefined;
 }
 
-function updateInlineModuleCopies(shipValue, oldName, newName, slotIndex) {
+function buildReferenceIndex(root) {
+  const references = new Map();
+  walk(root, value => {
+    if (isRecord(value) && typeof value.$id === 'string') references.set(value.$id, value);
+  });
+  return references;
+}
+
+function resolveReference(value, references) {
+  let current = value;
+  const seen = new Set();
+  while (isRecord(current) && typeof current.$ref === 'string') {
+    if (seen.has(current.$ref)) return undefined;
+    seen.add(current.$ref);
+    current = references.get(current.$ref);
+    if (!current) return undefined;
+  }
+  return current;
+}
+
+function updateInlineModuleCopies(shipValue, oldName, newName, slotIndex, references, changedObjects) {
   for (const fieldName of ['ammo', 'damagedParts', 'prevPartsBeingRepaired']) {
     const fieldKey = findOwnKey(shipValue, [fieldName]);
     const values = fieldKey && Array.isArray(shipValue[fieldKey]) ? shipValue[fieldKey] : [];
     for (const item of values) {
-      const module = fieldName === 'ammo'
+      const rawModule = fieldName === 'ammo'
         ? item?.Key ?? item?.key
         : fieldName === 'damagedParts'
           ? item?.module
           : item;
-      if (!isRecord(module) || module.$ref) continue;
+      const module = resolveReference(rawModule, references);
+      if (!isRecord(module)) continue;
       if (slotOf(module) !== slotIndex || moduleNameOf(module) !== oldName) continue;
+      if (changedObjects.has(module)) continue;
       setModuleTemplateName(module, newName);
+      changedObjects.add(module);
     }
   }
 }
@@ -157,6 +187,14 @@ function slotOf(value) {
 function markShipCachesDirty(value) {
   if (Object.prototype.hasOwnProperty.call(value, 'propulsionValuesDataDirty')) value.propulsionValuesDataDirty = true;
   if (Object.prototype.hasOwnProperty.call(value, 'spaceCombatValueDataDirty')) value.spaceCombatValueDataDirty = true;
+}
+
+function walk(value, visitor, seen = new Set()) {
+  if (!value || typeof value !== 'object' || seen.has(value)) return;
+  seen.add(value);
+  visitor(value);
+  if (Array.isArray(value)) value.forEach(item => walk(item, visitor, seen));
+  else Object.values(value).forEach(item => walk(item, visitor, seen));
 }
 
 function findOwnKey(value, candidates) {
