@@ -52,6 +52,7 @@ The default Influence view targets **The Servants** so you can identify the coun
 - Includes an advanced exact-template override for deliberate experiments with modules not observed in a verified compatible slot.
 - Allows one mistakenly built ship to be replaced with the complete saved technical configuration of another built player ship, useful for cases such as an extra coiler instead of a PD ship.
 - Preserves that corrected ship's game-state ID, display name, fleet and formation position, launch/refit dates, kills, officers, and other identity/history fields while copying the donor's technical configuration.
+- Whole-ship replacement is intentionally **per individual ship**; it does not rewrite the source design or every sibling ship using that design.
 - Remaps JSON reference metadata when cloning donor state so `$id` values are not duplicated.
 - Stages any number of edits in memory, shows an explicit change log, and supports resetting all staged edits.
 - Downloads a separate `-cheat` save instead of modifying the loaded source.
