@@ -4,21 +4,6 @@ import {
   humanizeModuleName,
 } from './cheat-editor.js';
 
-if (typeof document !== 'undefined') {
-  queueMicrotask(() => {
-    const warning = document.querySelector('#cheat-mode .cheat-warning p');
-    if (warning) warning.textContent = 'Every edit happens on an in-memory copy. Download creates a separate modified save. Weapon edits change the selected design template and propagate the matching deployed slot to every built ship using that design.';
-    const cards = [...document.querySelectorAll('#cheat-mode .cheat-card')];
-    const weaponCard = cards[0];
-    const heading = weaponCard?.querySelector('h3');
-    const paragraph = weaponCard?.querySelector('p');
-    const button = document.querySelector('#cheat-apply-weapon');
-    if (heading) heading.textContent = 'Edit a design weapon';
-    if (paragraph) paragraph.textContent = 'Use this for changes such as Phaser PD to Ion PD across an existing ship class. Select any built ship of the design; the editor changes the design template and propagates that weapon slot to every built ship using it.';
-    if (button) button.textContent = 'Replace weapon on design and built ships';
-  });
-}
-
 export function replaceDesignWeapon(root, { shipId, mount, slotIndex, targetModuleName, allowUnobserved = false }) {
   if (!['nose', 'hull'].includes(mount)) throw new Error(`Unsupported weapon mount ${mount}.`);
   if (!Number.isInteger(shipId) || !Number.isInteger(slotIndex) || !targetModuleName) {
