@@ -4,8 +4,8 @@ import {
   analyzeFleetCheats,
   compatibleWeaponTargets,
   replaceBuiltShipFromDonor,
-  swapBuiltShipWeapon,
 } from '../src/cheat-editor.js';
+import { replaceDesignWeapon } from '../src/cheat-template-editor.js';
 import { serializeTerraInvictaSave } from '../src/save-writer.js';
 
 const ref = value => ({ value });
@@ -107,28 +107,32 @@ test('discovers player fleets, built ships, designs, and slot-compatible weapon 
   assert.ok(targets.some(item => item.moduleName === 'IonPointDefense'));
 });
 
-test('weapon surgery isolates one built ship with a private cloned design', () => {
+test('weapon edit changes the design template and propagates to every built ship using it', () => {
   const original = fixture();
-  const result = swapBuiltShipWeapon(original, {
+  const result = replaceDesignWeapon(original, {
     shipId: 200,
     mount: 'hull',
     slotIndex: 0,
     targetModuleName: 'IonPointDefense',
   });
 
-  const edited = ship(result.root, 200);
+  const first = ship(result.root, 200);
   const sibling = ship(result.root, 202);
-  assert.match(edited.templateName, /^CoilerDesign__cheat_ship_200/);
-  assert.equal(edited.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
+  const unrelated = ship(result.root, 201);
+  assert.equal(first.templateName, 'CoilerDesign');
   assert.equal(sibling.templateName, 'CoilerDesign');
-  assert.equal(sibling.hullWeapons[0].moduleTemplateName, 'PhaserPointDefense');
+  assert.equal(first.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
+  assert.equal(sibling.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
+  assert.equal(unrelated.hullWeapons[0].moduleTemplateName, 'IonPointDefense');
 
   const faction = groupValues(result.root, 'TIFactionState')[0];
-  assert.equal(faction.shipDesignCount, 3);
-  assert.equal(faction.shipDesigns[0].hullWeaponTemplateEntries[0].moduleName, 'PhaserPointDefense');
-  const privateDesign = faction.shipDesigns.find(design => design.dataName === edited.templateName);
-  assert.equal(privateDesign.hullWeaponTemplateEntries[0].moduleName, 'IonPointDefense');
-  assert.equal(original.gamestates.TIFactionState[0].Value.shipDesigns.length, 2, 'source root must remain untouched');
+  assert.equal(faction.shipDesignCount, 2, 'template editing must not create private designs');
+  assert.equal(faction.shipDesigns[0].hullWeaponTemplateEntries[0].moduleName, 'IonPointDefense');
+  assert.equal(faction.shipDesigns[1].hullWeaponTemplateEntries[0].moduleName, 'IonPointDefense');
+  assert.equal(result.change.affectedShipCount, 2);
+  assert.deepEqual(result.change.affectedShipIds.sort((a, b) => a - b), [200, 202]);
+  assert.equal(original.gamestates.TIFactionState[0].Value.shipDesigns[0].hullWeaponTemplateEntries[0].moduleName, 'PhaserPointDefense', 'source root must remain untouched');
+  assert.equal(ship(original, 202).hullWeapons[0].moduleTemplateName, 'PhaserPointDefense', 'source built ships must remain untouched');
 });
 
 test('whole-ship correction copies donor technical state while preserving source identity and fleet history', () => {
