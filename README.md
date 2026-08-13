@@ -1,12 +1,13 @@
 # Terra Invicta Save Viewer
 
-A local-first browser tool that reads a Terra Invicta save and provides three complementary strategic views:
+A local-first browser tool that reads a Terra Invicta save and provides four complementary strategic views:
 
 1. **Influence attribution** shows which countries generate public-opinion Influence for each faction.
 2. **Faction threat** reconstructs the score used to identify the most powerful human enemy and explains which assets contribute to it.
 3. **Mining prospects** ranks every site on bodies the player faction has prospected, using editable resource-yield weights.
+4. **Cheat editor** stages deliberate fleet and ship corrections and downloads a separate modified save.
 
-The default Influence view targets **The Servants** so you can identify the countries currently funding them and model how much Influence a Public Campaign strategy could remove. The Threat and Mining views default to the detected human player faction.
+The default Influence view targets **The Servants** so you can identify the countries currently funding them and model how much Influence a Public Campaign strategy could remove. The Threat, Mining, and Cheat views default to the detected human player faction.
 
 ## Features
 
@@ -41,13 +42,30 @@ The default Influence view targets **The Servants** so you can identify the coun
 - Hides claimed, occupied, player-owned, and pending sites by default; a **Show claimed sites** toggle adds them back for comparison.
 - Shows the dominant contributors to each site's score and exports the currently visible ranking as CSV, respecting the claimed-sites toggle.
 
+### Fleet and ship cheat mode
+
+- Treats the player's dynamic `shipDesigns` entries as the primary objects for loadout editing.
+- Lists active ship design templates directly, including their saved display name, hull, template `dataName`, weapon slots, and number of built instances.
+- Reads editable weapon slots directly from `noseWeaponTemplateEntries` and `hullWeaponTemplateEntries`; a built ship is not required to discover or select a slot.
+- Uses one expert replacement control: an exact `moduleTemplateName` input with autocomplete suggestions from module names already present in the save.
+- Changes the selected design template itself and propagates the matching deployed weapon to every built ship whose `templateName` references that design.
+- Resolves Terra Invicta JSON `$id` / `$ref` indirection when propagating template changes. If one ship owns the concrete module object and sibling ships contain only `$ref` wrappers, the concrete definition is mutated once and the reference structure is preserved.
+- Supports active designs with zero built ships; those edits affect future builds only.
+- Separately allows one mistakenly built ship to be replaced with the complete saved technical configuration of another built player ship, useful for cases such as an extra coiler instead of a PD ship.
+- Preserves the corrected ship's game-state ID, display name, fleet and formation position, launch/refit dates, kills, officers, and other identity/history fields while copying the donor's technical configuration.
+- Remaps JSON reference metadata when cloning donor state so locally-owned `$id` values are not duplicated.
+- Stages any number of edits in memory, shows an explicit change log, and supports resetting all staged edits.
+- Downloads a separate `-cheat` save instead of modifying the loaded source.
+- Preserves gzip output when the input is gzip and the browser supports `CompressionStream`.
+- Preserves Terra Invicta's non-finite `Infinity`, `-Infinity`, and `NaN` numeric tokens during serialization.
+
 ### Save handling
 
 - Loads uncompressed JSON/JSON5 and gzip-compressed saves.
 - Parses JSON5 safely without `eval` or third-party dependencies.
 - Resolves Terra Invicta's relational `gamestates` object structure.
 - Processes the save entirely in the browser. No upload, backend, analytics, or network request is used.
-- Never modifies the source save.
+- Analysis modes never modify the source save. Cheat mode edits a cloned in-memory object and writes only a new downloaded file.
 
 ## Influence formula
 
@@ -116,6 +134,23 @@ The frontend allows any non-negative weights. The Equal-weight preset removes st
 
 A body is treated as prospected when the player faction's `intel` entry for its `TISpaceBodyState` is at least `1.0`. The game then exposes all hab sites on that body. Saved site yields are daily values; the viewer multiplies them by `30.436875` to display monthly output. The ranking uses base site yields and does not apply faction-specific mining bonuses, which affect all candidate sites similarly and do not belong to the geological prospect itself.
 
+## Cheat-mode mutation model
+
+Built `TISpaceShipState` objects persist deployed module state separately from the faction's dynamic ship-design templates. Terra Invicta may also deduplicate identical deployed module objects using JSON `$id` / `$ref` references across multiple ships.
+
+For a template weapon edit the editor therefore performs a coordinated mutation:
+
+1. locate the selected dynamic design by `dataName`,
+2. change the selected `noseWeaponTemplateEntries` or `hullWeaponTemplateEntries` entry,
+3. find every built player ship whose `templateName` points to that design,
+4. resolve the matching deployed module through the save-wide `$id` / `$ref` graph,
+5. mutate each unique concrete module definition once while preserving `$ref` wrappers, and
+6. mark relevant cached ship values dirty where those flags exist.
+
+This is intentionally template-first. Built ships are consequences of a template edit, not the object used to choose the loadout.
+
+For a whole-ship correction, another already-built player ship acts as a donor blueprint. The donor's saved technical state is cloned with fresh locally-owned JSON reference IDs, then the source ship's identity and fleet/history fields are restored onto that clone. The donor itself is unchanged.
+
 ## Run locally
 
 The app is static, but browser modules must be served over HTTP:
@@ -136,11 +171,11 @@ The repository is configured as a `uv` project for the Python development server
 npm test
 ```
 
-The test suite uses Node's built-in test runner and covers JSON5 parsing, relational region lookup, influence calculations, scenario calculations, threat component attribution, player-faction detection, active-module filtering, CP-weight fallback, self-assessment thresholds, prospecting-intel filtering, site-to-body resolution, yield conversion, occupancy classification, and custom mining weights.
+The test suite uses Node's built-in test runner and covers JSON5 parsing, relational region lookup, influence calculations, scenario calculations, threat component attribution, player-faction detection, active-module filtering, CP-weight fallback, self-assessment thresholds, prospecting-intel filtering, site-to-body resolution, yield conversion, occupancy classification, custom mining weights, fleet/ship discovery, template-first loadout discovery, `$id`/`$ref` template propagation, donor-based ship replacement, JSON reference remapping, browser module syntax, and non-finite save serialization.
 
 ## Supported save assumptions
 
-Groups are located by suffix rather than requiring a full namespace. The three modes currently inspect:
+Groups are located by suffix rather than requiring a full namespace. The four modes currently inspect:
 
 - `TINationState`
 - `TIRegionState`
@@ -166,4 +201,8 @@ Known field aliases are deliberately narrow and visible in diagnostics. Unknown 
 - Threat objective scoring is an omniscient estimate rather than a complete observer-by-observer intelligence reconstruction.
 - Template catalogs may lag a newly released game build. Unknown active modules or hulls are explicitly reported.
 - Mining scores do not include transfer time, delta-v, solar output, construction cost, faction mining bonuses, existing hab infrastructure, or strategic access constraints. They answer the narrower question: how attractive is the known geological yield under the selected resource priorities?
-- Gzip loading relies on the browser's native `DecompressionStream` API.
+- Exact replacement module names are intentionally expert input. The editor does not independently reconstruct every game compatibility rule; an impossible module/hull/slot combination may still be rejected or repaired by the game.
+- Ammo-bearing template edits retain existing saved ammo quantities while retargeting matching module references. For substantially different missile/kinetic configurations, donor-based whole-ship correction is safer.
+- Whole-ship replacement copies the donor's saved technical condition as the blueprint and does not consume resources or construction time. This is intentionally a cheat, not a simulated refit.
+- Modified saves should always be tested from a backup. Save internals can change between Terra Invicta versions.
+- Gzip loading relies on the browser's native `DecompressionStream` API; gzip writing uses `CompressionStream` when available and falls back to an uncompressed JSON save otherwise.
